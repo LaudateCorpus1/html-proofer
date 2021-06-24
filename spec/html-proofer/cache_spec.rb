@@ -246,58 +246,89 @@ describe 'Cache test' do
 
       Timecop.return
     end
+
+    it 'does recheck failures, regardless of external-only cache' do
+      cache_file_name = '.external.log'
+      cache_location = File.join(storage_dir, cache_file_name)
+
+      file = "#{FIXTURES_DIR}/cache/external_example.html"
+
+      new_time = Time.local(2021, 0o1, 27, 12, 0, 0)
+      Timecop.freeze(new_time)
+
+      File.delete(cache_location) if File.exist?(cache_location)
+
+      run_proofer(file, :file, external_only: true, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
+
+      cache = JSON.parse(File.read(cache_location))
+
+      expect(cache.keys.count).to eq(1)
+      expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
+
+      run_proofer(file, :file, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
+
+      cache = JSON.parse(File.read(cache_location))
+      expect(cache.keys.count).to eq(1)
+      expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
+
+      Timecop.return
+    end
+
+    it 'does recheck failures, regardless of external and internal cache' do
+      cache_file_name = '.internal_and_external.log'
+      cache_location = File.join(storage_dir, cache_file_name)
+
+      file = "#{FIXTURES_DIR}/cache/internal_and_external_example.html"
+
+      new_time = Time.local(2021, 0o1, 27, 12, 0, 0)
+      Timecop.freeze(new_time)
+
+      File.delete(cache_location) if File.exist?(cache_location)
+
+      run_proofer(file, :file, external_only: true, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
+
+      cache = JSON.parse(File.read(cache_location))
+
+      expect(cache.keys.count).to eq(1)
+      expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
+
+      run_proofer(file, :file, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
+
+      cache = JSON.parse(File.read(cache_location))
+      expect(cache.keys.count).to eq(2)
+      expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
+
+      Timecop.return
+    end
   end
 
-  it 'does recheck failures, regardless of external-only cache' do
-    cache_file_name = '.external.log'
+  it 'does not blow up if internal link has query params' do
+    cache_file_name = '.new_internal_url_w_query_params.log'
     cache_location = File.join(storage_dir, cache_file_name)
 
-    file = "#{FIXTURES_DIR}/cache/external_example.html"
+    file = "#{FIXTURES_DIR}/links/internal_query_link.html"
 
-    new_time = Time.local(2021, 0o1, 27, 12, 0, 0)
+    new_time = Time.local(2020, 0o1, 27, 12, 0, 0)
     Timecop.freeze(new_time)
 
     File.delete(cache_location) if File.exist?(cache_location)
 
-    run_proofer(file, :file, external_only: true, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
-
-    cache = JSON.parse(File.read(cache_location))
-
-    expect(cache.keys.count).to eq(1)
-    expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
-
     run_proofer(file, :file, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
 
     cache = JSON.parse(File.read(cache_location))
+
     expect(cache.keys.count).to eq(1)
-    expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
+    expect(cache.keys[0]).to eq('./gpl.png?v=2020-12-10-1')
 
     Timecop.return
-  end
 
-  it 'does recheck failures, regardless of external and internal cache' do
-    cache_file_name = '.internal_and_external.log'
-    cache_location = File.join(storage_dir, cache_file_name)
-
-    file = "#{FIXTURES_DIR}/cache/internal_and_external_example.html"
-
-    new_time = Time.local(2021, 0o1, 27, 12, 0, 0)
+    new_time = Time.local(2021, 0o6, 20, 12, 0, 0)
     Timecop.freeze(new_time)
 
-    File.delete(cache_location) if File.exist?(cache_location)
+    # expect_any_instance_of(HTMLProofer::Cache).to receive(:add)
 
-    run_proofer(file, :file, external_only: true, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
-
-    cache = JSON.parse(File.read(cache_location))
-
-    expect(cache.keys.count).to eq(1)
-    expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
-
-    run_proofer(file, :file, links_only: true, cache: { timeframe: '1d', cache_file: cache_file_name }.merge(default_cache_options))
-
-    cache = JSON.parse(File.read(cache_location))
-    expect(cache.keys.count).to eq(2)
-    expect(cache.keys[0]).to eq('https://github.com/gjtorikian/html-proofer')
+    # we expect one new link to be added because it's outside the 30d time frame
+    run_proofer(file, :file, cache: { timeframe: '30d', cache_file: cache_file_name }.merge(default_cache_options))
 
     Timecop.return
   end
